@@ -1,0 +1,30 @@
+# Core FastAPI (use latest versions - they have pre-built wheels for Windows)
+fastapi
+uvicorn[standard]
+python-multipart
+
+# Database
+sqlalchemy
+
+# Authentication & Security
+python-jose[cryptography]
+passlib[bcrypt]
+python-dotenv
+
+# PDF Processing
+PyPDF2
+
+# HTTP & Files
+httpx
+requests
+aiofiles
+
+# Email Validation
+email-validator
+
+# AI Components (install after core packages work)
+# langchain
+# groq
+# chromadb
+# sentence-transformers
+# tiktoken
