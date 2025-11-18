@@ -1,4 +1,6 @@
-from langchain_text_splitters import RecursiveCharacterTextSplitter
+# from langchain.text_splitters import RecursiveCharacterTextSplitter
+from langchain.text_splitter import RecursiveCharacterTextSplitter
+
 from langchain_community.embeddings import HuggingFaceEmbeddings
 from langchain_community.vectorstores import Chroma
 from groq import Groq
@@ -94,14 +96,14 @@ class RAGService:
                 collection_name=f"doc_{document_id}"
             )
             
-            # Retrieve relevant chunks
-            retriever = vectorstore.as_retriever(
-                search_type="similarity",
-                search_kwargs={"k": 3}  # Get top 3 most relevant chunks
-            )
+            # # Retrieve relevant chunks
+            # retriever = vectorstore.as_retriever(
+            #     search_type="similarity",
+            #     search_kwargs={"k": 3}  # Get top 3 most relevant chunks
+            # )
             
             # relevant_docs = retriever.get_relevant_documents(question)
-            relevant_docs = vectorstore.similarity_search(question, k=3)
+            relevant_docs = vectorstore.similarity_search(question, k=8)
 
             
             # Prepare context from retrieved documents
@@ -132,7 +134,7 @@ Answer:"""
                     }
                 ],
                 model=settings.GROQ_MODEL,
-                temperature=0.3,
+                temperature=0.9,
                 max_tokens=1000,
             )
             

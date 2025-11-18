@@ -18,7 +18,7 @@ class Settings:
     
     # Groq API
     GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")
-    GROQ_MODEL = "llama-3.3-70b-versatile"
+    GROQ_MODEL = "openai/gpt-oss-120b"
     
     # Application
     APP_NAME = os.getenv("APP_NAME", "AI Document Assistant")

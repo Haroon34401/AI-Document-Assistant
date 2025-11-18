@@ -1,11 +1,82 @@
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { chatService } from '../../services/chatService';
-import { Send, Loader } from 'lucide-react';
+import { Send, Loader, Bot, User, Sparkles } from 'lucide-react';
+import './ChatInterface.css';
 
 export default function ChatInterface({ document }) {
   const [messages, setMessages] = useState([]);
   const [question, setQuestion] = useState('');
   const [loading, setLoading] = useState(false);
+  const messagesEndRef = useRef(null);
+
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  };
+
+  useEffect(() => {
+    scrollToBottom();
+  }, [messages]);
+
+  // Function to parse markdown-style text into React elements
+  const parseMarkdown = (text) => {
+    if (!text) return null;
+
+    // Split by lines
+    const lines = text.split('\n');
+    const elements = [];
+    let listItems = [];
+    let inList = false;
+
+    lines.forEach((line, index) => {
+      // Check for list items (bullets starting with - or * or numbered)
+      const bulletMatch = line.match(/^[\s]*[-*•]\s+(.+)$/);
+      const numberedMatch = line.match(/^[\s]*\d+\.\s+(.+)$/);
+      
+      if (bulletMatch || numberedMatch) {
+        const content = bulletMatch ? bulletMatch[1] : numberedMatch[1];
+        listItems.push(
+          <li key={`li-${index}`} dangerouslySetInnerHTML={{ __html: parseInlineFormatting(content) }} />
+        );
+        inList = true;
+      } else {
+        // If we were in a list and now we're not, close the list
+        if (inList && listItems.length > 0) {
+          elements.push(<ul key={`ul-${index}`}>{listItems}</ul>);
+          listItems = [];
+          inList = false;
+        }
+
+        // Skip empty lines
+        if (line.trim() === '') {
+          return;
+        }
+
+        // Regular paragraph
+        elements.push(
+          <p key={`p-${index}`} dangerouslySetInnerHTML={{ __html: parseInlineFormatting(line) }} />
+        );
+      }
+    });
+
+    // Close any remaining list
+    if (inList && listItems.length > 0) {
+      elements.push(<ul key="ul-final">{listItems}</ul>);
+    }
+
+    return elements;
+  };
+
+  // Parse inline formatting (bold, code, etc.)
+  const parseInlineFormatting = (text) => {
+    // Bold text (**text** or __text__)
+    text = text.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+    text = text.replace(/__(.+?)__/g, '<strong>$1</strong>');
+    
+    // Inline code (`code`)
+    text = text.replace(/`([^`]+)`/g, '<code>$1</code>');
+    
+    return text;
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -27,7 +98,7 @@ export default function ChatInterface({ document }) {
     } catch (error) {
       const errorMessage = {
         role: 'assistant',
-        content: 'Sorry, I encountered an error. Please try again.',
+        content: 'Sorry, I encountered an error processing your question. Please try again.',
         error: true,
       };
       setMessages((prev) => [...prev, errorMessage]);
@@ -36,77 +107,127 @@ export default function ChatInterface({ document }) {
     }
   };
 
-  return (
-    <div className="flex flex-col h-full">
-      {/* Header */}
-      <div className="border-b pb-4 mb-4">
-        <h3 className="text-lg font-bold text-gray-900">{document.original_filename}</h3>
-        <p className="text-sm text-gray-500">
-          {document.page_count} pages • Ask anything about this document
-        </p>
-      </div>
+  const suggestedQuestions = [
+    "What is the main topic of this document?",
+    "Summarize the key points",
+    "What are the important dates mentioned?",
+  ];
 
-      {/* Messages */}
-      <div className="flex-1 overflow-y-auto mb-4 space-y-4" style={{ maxHeight: '500px' }}>
+  return (
+    <div className="chat-interface">
+      {/* Messages Container */}
+      <div className="chat-messages">
         {messages.length === 0 ? (
-          <div className="text-center text-gray-500 py-8">
-            <p>Start by asking a question about this document!</p>
-            <p className="text-sm mt-2">Example: "What is the main topic of this document?"</p>
+          <div className="chat-welcome">
+            <div className="welcome-icon">
+              <Sparkles className="h-10 w-10 text-blue-600" style={{ color: 'var(--brand-primary)' }} />
+            </div>
+            <h4 className="welcome-title">
+              Ready to explore your document
+            </h4>
+            <p className="welcome-subtitle">
+              Ask me anything about "{document.original_filename}". I'll help you understand the content.
+            </p>
+            
+            {/* Suggested Questions */}
+            <div className="suggested-questions">
+              <p className="suggested-label">Try asking:</p>
+              {suggestedQuestions.map((q, idx) => (
+                <button
+                  key={idx}
+                  onClick={() => setQuestion(q)}
+                  className="suggested-button"
+                >
+                  <span>💡</span> {q}
+                </button>
+              ))}
+            </div>
           </div>
         ) : (
-          messages.map((msg, idx) => (
-            <div
-              key={idx}
-              className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
-            >
+          <div className="message-list">
+            {messages.map((msg, idx) => (
               <div
-                className={`max-w-3/4 rounded-lg p-4 ${
-                  msg.role === 'user'
-                    ? 'bg-blue-600 text-white'
-                    : msg.error
-                    ? 'bg-red-100 text-red-800'
-                    : 'bg-gray-100 text-gray-900'
-                }`}
+                key={idx}
+                className={`message-wrapper ${msg.role}`}
               >
-                <p className="whitespace-pre-wrap">{msg.content}</p>
-                {msg.sources && msg.sources.length > 0 && (
-                  <div className="mt-2 pt-2 border-t border-gray-300">
-                    <p className="text-xs text-gray-600">
-                      Sources: {msg.sources.join(', ')}
-                    </p>
+                <div className={`message-container ${msg.role === 'user' ? 'reverse' : ''}`}>
+                  {/* Avatar */}
+                  <div className={`message-avatar ${msg.role} ${msg.error ? 'error' : ''}`}>
+                    {msg.role === 'user' ? (
+                      <User className="h-5 w-5 text-white" />
+                    ) : (
+                      <Bot className="h-5 w-5 text-white" style={{ color: msg.error ? 'var(--error)' : 'white' }} />
+                    )}
                   </div>
-                )}
+
+                  {/* Message Content */}
+                  <div className={`message-bubble ${msg.role} ${msg.error ? 'error' : ''}`}>
+                    <div className="message-content">
+                      {msg.role === 'user' ? (
+                        // User messages remain as plain text
+                        <p>{msg.content}</p>
+                      ) : (
+                        // Assistant messages are parsed for formatting
+                        parseMarkdown(msg.content)
+                      )}
+                    </div>
+                  </div>
+                </div>
               </div>
-            </div>
-          ))
-        )}
-        {loading && (
-          <div className="flex justify-start">
-            <div className="bg-gray-100 rounded-lg p-4">
-              <Loader className="h-5 w-5 animate-spin text-gray-600" />
-            </div>
+            ))}
+
+            {/* Loading Indicator */}
+            {loading && (
+              <div className="loading-message">
+                <div className="loading-content">
+                  <div className="message-avatar assistant">
+                    <Bot className="h-5 w-5 text-white" />
+                  </div>
+                  <div className="loading-bubble">
+                    <div className="loading-indicator">
+                      <Loader className="h-4 w-4 animate-spin" style={{ color: 'var(--brand-primary)' }} />
+                      <span className="loading-text">Thinking...</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+            
+            <div ref={messagesEndRef} />
           </div>
         )}
       </div>
 
-      {/* Input */}
-      <form onSubmit={handleSubmit} className="flex space-x-2">
-        <input
-          type="text"
-          value={question}
-          onChange={(e) => setQuestion(e.target.value)}
-          placeholder="Ask a question about this document..."
-          className="flex-1 px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-          disabled={loading}
-        />
-        <button
-          type="submit"
-          disabled={!question.trim() || loading}
-          className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          <Send className="h-5 w-5" />
-        </button>
-      </form>
+      {/* Input Form */}
+      <div className="chat-input-container">
+        <form onSubmit={handleSubmit} className="chat-form">
+          <div className="input-wrapper">
+            <input
+              type="text"
+              value={question}
+              onChange={(e) => setQuestion(e.target.value)}
+              placeholder="Ask a question about this document..."
+              className="chat-input"
+              disabled={loading}
+            />
+            <div className="input-hint">
+              <kbd className="kbd">Enter</kbd>
+            </div>
+          </div>
+          <button
+            type="submit"
+            disabled={!question.trim() || loading}
+            className="send-button"
+          >
+            <Send className="h-5 w-5" />
+            <span>Send</span>
+          </button>
+        </form>
+        
+        <p className="chat-footer-hint">
+          Press <kbd className="kbd">Enter</kbd> to send your question
+        </p>
+      </div>
     </div>
   );
 }

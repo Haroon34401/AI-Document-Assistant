@@ -19,7 +19,7 @@ async def lifespan(app: FastAPI):
     print(f"🔧 Debug Mode: {settings.DEBUG}")
     
     # Initialize database
-    init_db()
+    # init_db()
     
     print("✅ Application started successfully!")
     

@@ -1,30 +1,34 @@
-# Core FastAPI (use latest versions - they have pre-built wheels for Windows)
-fastapi
-uvicorn[standard]
-python-multipart
+# Core FastAPI
+fastapi==0.115.0
+uvicorn[standard]==0.30.6
+python-multipart==0.0.9
 
 # Database
-sqlalchemy
+sqlalchemy==2.0.35
 
 # Authentication & Security
-python-jose[cryptography]
-passlib[bcrypt]
-python-dotenv
+python-jose[cryptography]==3.3.0
+bcrypt==4.2.0
+python-dotenv==1.0.1
 
 # PDF Processing
-PyPDF2
+PyPDF2==3.0.1
 
 # HTTP & Files
-httpx
-requests
-aiofiles
+httpx==0.27.2
+requests==2.32.3
+aiofiles==24.1.0
 
 # Email Validation
-email-validator
+email-validator==2.2.0
+pydantic[email]==2.9.2
 
-# AI Components (install after core packages work)
-# langchain
-# groq
-# chromadb
-# sentence-transformers
-# tiktoken
+# LangChain & AI
+langchain==0.1.10
+groq==0.11.0
+chromadb==0.5.20
+sentence-transformers==3.3.1
+tiktoken==0.8.0
+
+# Additional dependencies
+pydantic-settings==2.6.1

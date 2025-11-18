@@ -1,38 +1,48 @@
-from passlib.context import CryptContext
-from jose import JWTError, jwt
-from datetime import datetime, timedelta
+import bcrypt
+from datetime import datetime, timedelta, timezone
 from typing import Optional
-from app.config import settings
+from jose import JWTError, jwt
+from fastapi import HTTPException, status
 
-# Password hashing context
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+from app.config import settings
 
 
 def hash_password(password: str) -> str:
     """
-    Hash a plain text password using bcrypt.
+    Hash a password using bcrypt.
+    Truncates password to 72 bytes (bcrypt limitation).
     
     Args:
         password: Plain text password
         
     Returns:
-        Hashed password string
+        Hashed password as string
     """
-    return pwd_context.hash(password)
+    # Truncate password to 72 bytes if necessary (bcrypt limitation)
+    password_bytes = password.encode('utf-8')[:72]
+    salt = bcrypt.gensalt(rounds=12)  # 12 rounds is a good balance
+    hashed = bcrypt.hashpw(password_bytes, salt)
+    return hashed.decode('utf-8')
 
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     """
-    Verify a plain text password against a hashed password.
+    Verify a password against a bcrypt hash.
     
     Args:
         plain_password: Plain text password to verify
-        hashed_password: Hashed password from database
+        hashed_password: Bcrypt hashed password
         
     Returns:
         True if password matches, False otherwise
     """
-    return pwd_context.verify(plain_password, hashed_password)
+    try:
+        password_bytes = plain_password.encode('utf-8')[:72]
+        hashed_bytes = hashed_password.encode('utf-8')
+        return bcrypt.checkpw(password_bytes, hashed_bytes)
+    except Exception as e:
+        print(f"Password verification error: {e}")
+        return False
 
 
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:
@@ -40,26 +50,33 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -
     Create a JWT access token.
     
     Args:
-        data: Dictionary containing user data (usually {"sub": user_id})
+        data: Dictionary containing claims to encode in the token
         expires_delta: Optional custom expiration time
         
     Returns:
-        Encoded JWT token string
+        Encoded JWT token as string
     """
     to_encode = data.copy()
     
     if expires_delta:
-        expire = datetime.utcnow() + expires_delta
+        expire = datetime.now(timezone.utc) + expires_delta
     else:
-        expire = datetime.utcnow() + timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+        expire = datetime.now(timezone.utc) + timedelta(
+            minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES
+        )
     
-    to_encode.update({"exp": expire})
-    encoded_jwt = jwt.encode(to_encode, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
+    to_encode.update({"exp": expire, "iat": datetime.now(timezone.utc)})
+    
+    encoded_jwt = jwt.encode(
+        to_encode,
+        settings.SECRET_KEY,
+        algorithm=settings.ALGORITHM
+    )
     
     return encoded_jwt
 
 
-def decode_access_token(token: str) -> Optional[dict]:
+def decode_access_token(token: str) -> dict:
     """
     Decode and verify a JWT access token.
     
@@ -67,44 +84,21 @@ def decode_access_token(token: str) -> Optional[dict]:
         token: JWT token string
         
     Returns:
-        Decoded token data if valid, None if invalid
+        Decoded token payload
+        
+    Raises:
+        HTTPException: If token is invalid or expired
     """
     try:
-        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
+        payload = jwt.decode(
+            token,
+            settings.SECRET_KEY,
+            algorithms=[settings.ALGORITHM]
+        )
         return payload
-    except JWTError:
-        return None
-
-
-def get_user_from_token(token: str) -> Optional[str]:
-    """
-    Extract user ID from JWT token.
-    
-    Args:
-        token: JWT token string
-        
-    Returns:
-        User ID (username or email) if valid, None if invalid
-    """
-    payload = decode_access_token(token)
-    if payload is None:
-        return None
-    
-    user_id: str = payload.get("sub")
-    return user_id
-
-
-# # Example usage for testing
-# if __name__ == "__main__":
-#     # Test password hashing
-#     password = "test123"
-#     hashed = hash_password(password)
-#     print(f"Original: {password}")
-#     print(f"Hashed: {hashed}")
-#     print(f"Verification: {verify_password(password, hashed)}")
-    
-#     # Test JWT token
-#     token = create_access_token(data={"sub": "testuser"})
-#     print(f"\nToken: {token[:50]}...")
-#     decoded = decode_access_token(token)
-#     print(f"Decoded: {decoded}")
+    except JWTError as e:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Could not validate credentials",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
